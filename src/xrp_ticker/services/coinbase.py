@@ -105,9 +105,7 @@ class CoinbaseService:
 
     async def _poll_loop(self) -> None:
         """Main polling loop."""
-        self._client = httpx.AsyncClient(
-            headers={"User-Agent": "XRP-Ticker/1.0"}
-        )
+        self._client = httpx.AsyncClient(headers={"User-Agent": "XRP-Ticker/1.0"})
 
         try:
             while self._running:

@@ -78,12 +78,8 @@ class DebugPanel(Static):
         )
 
     def update_endpoints(self, price_source: str = "---", xrpl: str = "---") -> None:
-        self.query_one("#debug-price-endpoint", Label).update(
-            f"Price: {price_source[:30]}..."
-        )
-        self.query_one("#debug-xrpl-endpoint", Label).update(
-            f"XRPL: {xrpl[:30]}..."
-        )
+        self.query_one("#debug-price-endpoint", Label).update(f"Price: {price_source[:30]}...")
+        self.query_one("#debug-xrpl-endpoint", Label).update(f"XRPL: {xrpl[:30]}...")
 
 
 class XRPTickerApp(App):

@@ -9,6 +9,7 @@ from textual.widget import Widget
 
 class SparklineStyle(Enum):
     """Available sparkline rendering styles."""
+
     BLOCKS = "blocks"
     BRAILLE = "braille"
     DOTS = "dots"

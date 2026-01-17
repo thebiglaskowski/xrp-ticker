@@ -1,6 +1,5 @@
 """Main price display widget with animations."""
 
-
 from textual.app import ComposeResult
 from textual.containers import Container
 from textual.reactive import reactive
@@ -36,7 +35,9 @@ class PriceDisplayWidget(Widget):
     def compose(self) -> ComposeResult:
         """Create child widgets."""
         with Container(classes="price-container"):
-            yield Label("\uede8 XRP/USD • \uf0ec Coinbase", id="source-label", classes="price-source")
+            yield Label(
+                "\uede8 XRP/USD • \uf0ec Coinbase", id="source-label", classes="price-source"
+            )
             yield Label("---.----", id="price-label", classes="price-value price-large")
             yield Label("", id="change-label", classes="price-change price-neutral")
 
@@ -104,9 +105,7 @@ class PriceDisplayWidget(Widget):
             change_label.remove_class("price-up", "price-down")
             change_label.add_class("price-neutral")
 
-        change_label.update(
-            f"{arrow} {self.price_change:+.4f} ({self.price_change_percent:+.2f}%)"
-        )
+        change_label.update(f"{arrow} {self.price_change:+.4f} ({self.price_change_percent:+.2f}%)")
 
     def watch_is_connected(self, connected: bool) -> None:
         """React to connection state changes."""

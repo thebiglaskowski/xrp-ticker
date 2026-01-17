@@ -24,13 +24,15 @@ def parse_args() -> argparse.Namespace:
     )
 
     parser.add_argument(
-        "-w", "--wallet",
+        "-w",
+        "--wallet",
         help="XRP wallet address (overrides config file)",
         type=str,
     )
 
     parser.add_argument(
-        "-c", "--config",
+        "-c",
+        "--config",
         help="Path to config file",
         type=Path,
     )
@@ -43,7 +45,8 @@ def parse_args() -> argparse.Namespace:
     )
 
     parser.add_argument(
-        "-d", "--debug",
+        "-d",
+        "--debug",
         help="Enable debug logging",
         action="store_true",
     )

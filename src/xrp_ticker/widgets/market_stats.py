@@ -95,21 +95,13 @@ class MarketStatsWidget(Widget):
         """Create child widgets."""
         with Horizontal():
             yield StatBox(
-                "󰁝 24h High", "---", "market-stat-high",
-                id="stat-high", classes="market-stat"
+                "󰁝 24h High", "---", "market-stat-high", id="stat-high", classes="market-stat"
             )
             yield StatBox(
-                "󰁅 24h Low", "---", "market-stat-low",
-                id="stat-low", classes="market-stat"
+                "󰁅 24h Low", "---", "market-stat-low", id="stat-low", classes="market-stat"
             )
-            yield StatBox(
-                "󰘦 24h Change", "---", "",
-                id="stat-change", classes="market-stat"
-            )
-            yield StatBox(
-                "󰁨 24h Volume", "---", "",
-                id="stat-volume", classes="market-stat"
-            )
+            yield StatBox("󰘦 24h Change", "---", "", id="stat-change", classes="market-stat")
+            yield StatBox("󰁨 24h Volume", "---", "", id="stat-volume", classes="market-stat")
 
     def watch_high_24h(self, high: float | None) -> None:
         """Update high display."""
