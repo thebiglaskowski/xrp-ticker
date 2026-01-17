@@ -1,0 +1,22 @@
+# XRP Ticker Configuration
+# Copy this file to config.toml and update with your settings
+
+[wallet]
+# Your XRP wallet address (r-address format)
+address = "rYourXRPAddressHere"
+
+[display]
+# Seconds between UI updates
+refresh_rate = 0.5
+# Minutes of price history to show in sparkline
+sparkline_minutes = 60
+# Color theme: "cyberpunk", "classic", "minimal"
+theme = "cyberpunk"
+
+[connections]
+# Primary price data source
+binance_ws = "wss://stream.binance.com:9443/ws/xrpusdt@ticker"
+# Primary XRPL endpoint
+xrpl_ws = "wss://xrplcluster.com"
+# Seconds between balance checks
+xrpl_poll_interval = 30
