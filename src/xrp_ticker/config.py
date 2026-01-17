@@ -5,7 +5,7 @@ import os
 import tomllib
 from pathlib import Path
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 
 logger = logging.getLogger(__name__)
 
@@ -13,16 +13,33 @@ logger = logging.getLogger(__name__)
 class WalletConfig(BaseModel):
     """Wallet configuration."""
 
-    address: str = Field(description="XRP wallet address (r-address)")
+    addresses: list[str] = Field(default=[], description="XRP wallet addresses (r-addresses)")
 
-    @field_validator("address")
+    @model_validator(mode="before")
     @classmethod
-    def validate_xrp_address(cls, v: str) -> str:
-        """Validate XRP address format."""
-        if not v.startswith("r"):
-            raise ValueError("XRP address must start with 'r'")
-        if len(v) < 25 or len(v) > 35:
-            raise ValueError("XRP address must be 25-35 characters")
+    def handle_legacy_address(cls, data):
+        """Convert legacy 'address' field to 'addresses' list."""
+        if isinstance(data, dict) and "address" in data and "addresses" not in data:
+            data["addresses"] = [data.pop("address")]
+        return data
+
+    @field_validator("addresses", mode="before")
+    @classmethod
+    def convert_single_address(cls, v):
+        """Convert single address string to list for backwards compatibility."""
+        if isinstance(v, str):
+            return [v]
+        return v
+
+    @field_validator("addresses")
+    @classmethod
+    def validate_xrp_addresses(cls, v: list[str]) -> list[str]:
+        """Validate XRP address formats."""
+        for addr in v:
+            if not addr.startswith("r"):
+                raise ValueError(f"XRP address must start with 'r': {addr}")
+            if len(addr) < 25 or len(addr) > 35:
+                raise ValueError(f"XRP address must be 25-35 characters: {addr}")
         return v
 
 
@@ -135,7 +152,8 @@ def create_default_config(wallet_address: str, output_path: Path | None = None) 
     config_content = f'''# XRP Ticker Configuration
 
 [wallet]
-address = "{wallet_address}"
+# Single address or multiple addresses supported
+addresses = ["{wallet_address}"]
 
 [display]
 refresh_rate = 0.5

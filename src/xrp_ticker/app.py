@@ -145,7 +145,7 @@ class XRPTickerApp(App):
 
         # Initialize XRPL service
         self._xrpl_service = XRPLWebSocketService(
-            wallet_address=self.config.wallet.address,
+            wallet_addresses=self.config.wallet.addresses,
             endpoints=self.config.connections.xrpl_endpoints,
             poll_interval=self.config.connections.xrpl_poll_interval,
             on_balance_update=self._handle_balance_update,

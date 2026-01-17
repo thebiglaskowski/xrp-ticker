@@ -34,13 +34,13 @@ class XRPLWebSocketService:
 
     def __init__(
         self,
-        wallet_address: str,
+        wallet_addresses: list[str],
         endpoints: list[str] | None = None,
         poll_interval: int = 30,
         on_balance_update: Callable[[WalletData], None] | None = None,
         on_status_change: Callable[[ServiceStatus], None] | None = None,
     ):
-        self.wallet_address = wallet_address
+        self.wallet_addresses = wallet_addresses
         self.endpoints = endpoints or DEFAULT_ENDPOINTS.copy()
         self.poll_interval = poll_interval
         self.on_balance_update = on_balance_update
@@ -100,11 +100,11 @@ class XRPLWebSocketService:
         # If we've cycled back to 0, we've tried all endpoints
         return self._current_endpoint_index != 0
 
-    async def _fetch_balance(self, websocket) -> WalletData | None:
-        """Fetch wallet balance via account_info request."""
+    async def _fetch_single_balance(self, websocket, address: str) -> int:
+        """Fetch balance for a single wallet. Returns drops or 0 on error."""
         request = {
             "command": "account_info",
-            "account": self.wallet_address,
+            "account": address,
             "ledger_index": "validated",
         }
 
@@ -117,45 +117,58 @@ class XRPLWebSocketService:
 
             if "error" in response:
                 error_msg = response.get("error_message", response.get("error", "Unknown error"))
-                logger.warning(f"XRPL error: {error_msg}")
+                logger.warning(f"XRPL error for {address}: {error_msg}")
 
-                # Check for account not found (unfunded wallet)
+                # Account not found (unfunded wallet) - return 0
                 if response.get("error") == "actNotFound":
-                    logger.info(f"Wallet {self.wallet_address} not found (may be unfunded)")
-                    return WalletData.from_drops(
-                        address=self.wallet_address,
-                        drops=0,
-                        source=self.current_endpoint,
-                    )
-                return None
+                    logger.info(f"Wallet {address} not found (may be unfunded)")
+                    return 0
+                return 0
 
             # Extract account data
             result = response.get("result", {})
             account_data = result.get("account_data", {})
 
             if not account_data:
-                logger.warning("No account_data in response")
-                return None
+                logger.warning(f"No account_data in response for {address}")
+                return 0
 
             balance_drops = int(account_data.get("Balance", 0))
-            wallet_data = WalletData.from_drops(
-                address=account_data.get("Account", self.wallet_address),
-                drops=balance_drops,
-                source=self.current_endpoint,
-            )
-
-            logger.debug(f"Balance: {wallet_data.balance_xrp:.6f} XRP")
-            return wallet_data
+            logger.debug(f"Balance for {address}: {balance_drops / 1_000_000:.6f} XRP")
+            return balance_drops
 
         except TimeoutError:
-            logger.warning("XRPL request timeout")
-            return None
+            logger.warning(f"XRPL request timeout for {address}")
+            return 0
         except json.JSONDecodeError as e:
-            logger.warning(f"Invalid JSON response: {e}")
-            return None
+            logger.warning(f"Invalid JSON response for {address}: {e}")
+            return 0
         except Exception as e:
-            logger.error(f"Error fetching balance: {e}")
-            return None
+            logger.error(f"Error fetching balance for {address}: {e}")
+            return 0
+
+    async def _fetch_all_balances(self, websocket) -> WalletData | None:
+        """Fetch and aggregate balances for all wallets."""
+        total_drops = 0
+
+        for address in self.wallet_addresses:
+            drops = await self._fetch_single_balance(websocket, address)
+            total_drops += drops
+
+        # Create aggregated wallet data
+        wallet_count = len(self.wallet_addresses)
+        display_address = (
+            self.wallet_addresses[0] if wallet_count == 1 else f"{wallet_count} wallets"
+        )
+
+        wallet_data = WalletData.from_drops(
+            address=display_address,
+            drops=total_drops,
+            source=self.current_endpoint,
+        )
+
+        logger.debug(f"Total balance ({wallet_count} wallets): {wallet_data.balance_xrp:.6f} XRP")
+        return wallet_data
 
     async def _connect_and_poll(self) -> None:
         """Main connection loop with polling and automatic reconnection."""
@@ -173,8 +186,8 @@ class XRPLWebSocketService:
 
                     # Poll loop
                     while self._running:
-                        # Fetch balance
-                        wallet_data = await self._fetch_balance(websocket)
+                        # Fetch balances for all wallets
+                        wallet_data = await self._fetch_all_balances(websocket)
 
                         if wallet_data:
                             self._status.last_message = datetime.now()
@@ -278,7 +291,7 @@ class XRPLWebSocketService:
         for i, endpoint in enumerate(self.endpoints):
             try:
                 async with connect(endpoint) as websocket:
-                    wallet_data = await self._fetch_balance(websocket)
+                    wallet_data = await self._fetch_all_balances(websocket)
                     if wallet_data:
                         return wallet_data
             except Exception as e:

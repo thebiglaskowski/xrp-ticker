@@ -1,0 +1,21 @@
+# XRP Ticker Configuration
+# Copy this file to config.toml and update with your settings
+
+[wallet]
+# Single wallet address
+addresses = ["rYourXRPAddressHere"]
+
+# Or multiple wallet addresses (balances will be aggregated)
+# addresses = [
+#     "rAddress1Here",
+#     "rAddress2Here",
+#     "rAddress3Here",
+# ]
+
+[display]
+# Color theme: "ripple" or "monokai"
+theme = "ripple"
+
+[connections]
+# Seconds between balance checks (10-300)
+xrpl_poll_interval = 30

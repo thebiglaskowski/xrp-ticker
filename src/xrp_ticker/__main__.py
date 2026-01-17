@@ -127,20 +127,18 @@ def main() -> int:
 
         # Create in-memory config
         config = AppConfig(
-            wallet=WalletConfig(address=wallet_address),
+            wallet=WalletConfig(addresses=[wallet_address]),
             display=DisplayConfig(),
             connections=ConnectionsConfig(),
         )
 
     # Override wallet address if provided via CLI
     if args.wallet:
-        config.wallet.address = args.wallet
+        config.wallet.addresses = [args.wallet]
 
-    # Validate wallet address
-    try:
-        WalletConfig(address=config.wallet.address)
-    except ValueError as e:
-        print(f"Error: Invalid wallet address - {e}")
+    # Validate wallet addresses
+    if not config.wallet.addresses:
+        print("Error: No wallet addresses configured")
         return 1
 
     # Run the app

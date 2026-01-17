@@ -9,7 +9,7 @@ A modern, visually stunning terminal-based XRP portfolio tracker with real-time 
 ## ✨ Features
 
 - 📈 **Real-time XRP/USD price** via Coinbase API
-- 💰 **Live wallet balance** pulled directly from XRPL WebSocket
+- 💰 **Live wallet balance** pulled directly from XRPL WebSocket (supports multiple self-custody wallets)
 - 💵 **Portfolio valuation** calculated in real-time
 - 🔔 **Price change indicators** with animated flash feedback
 - 📊 **Sparkline chart** with multiple styles (blocks, braille, dots, line)
@@ -47,7 +47,11 @@ Create a `config.toml` file in the project directory or `~/.config/xrp-ticker/`:
 
 ```toml
 [wallet]
-address = "rYourXRPAddressHere"
+# Single wallet
+addresses = ["rYourXRPAddressHere"]
+
+# Or multiple wallets (balances are aggregated)
+# addresses = ["rWallet1", "rWallet2", "rWallet3"]
 
 [display]
 theme = "ripple"  # or "monokai"
@@ -55,6 +59,8 @@ theme = "ripple"  # or "monokai"
 [connections]
 xrpl_poll_interval = 10  # seconds between XRPL balance checks
 ```
+
+> **Note:** Only self-custody wallet addresses work with this app (hardware wallets, software wallets, etc.). Exchange deposit addresses (Coinbase, Kraken, Binance, etc.) won't show your actual balance - exchanges use shared omnibus wallets with destination tags to track individual users internally.
 
 Or initialize a config file:
 
