@@ -2,6 +2,7 @@
 
 import logging
 from pathlib import Path
+from typing import Final
 
 from textual.app import App, ComposeResult
 from textual.binding import Binding
@@ -12,6 +13,7 @@ from textual.widgets import Label, Static
 from .config import AppConfig
 from .models import ConnectionState, PriceData, ServiceStatus, WalletData
 from .services import CoinbaseService, XRPLWebSocketService
+from .themes import THEME_NAMES, get_next_theme
 from .widgets import (
     MarketStatsWidget,
     PortfolioWidget,
@@ -23,7 +25,7 @@ from .widgets import (
 logger = logging.getLogger(__name__)
 
 # Path to CSS file
-CSS_PATH = Path(__file__).parent / "styles" / "app.tcss"
+CSS_PATH: Final[Path] = Path(__file__).parent / "styles" / "app.tcss"
 
 
 class HelpScreen(ModalScreen):
@@ -67,19 +69,30 @@ class DebugPanel(Static):
 
     def increment_price_count(self) -> None:
         self._price_messages += 1
-        self.query_one("#debug-price-count", Label).update(
-            f"Price messages: {self._price_messages}"
-        )
+        try:
+            self.query_one("#debug-price-count", Label).update(
+                f"Price messages: {self._price_messages}"
+            )
+        except Exception:
+            pass  # Widget not yet mounted
 
     def increment_balance_count(self) -> None:
         self._balance_messages += 1
-        self.query_one("#debug-balance-count", Label).update(
-            f"Balance messages: {self._balance_messages}"
-        )
+        try:
+            self.query_one("#debug-balance-count", Label).update(
+                f"Balance messages: {self._balance_messages}"
+            )
+        except Exception:
+            pass  # Widget not yet mounted
 
     def update_endpoints(self, price_source: str = "---", xrpl: str = "---") -> None:
-        self.query_one("#debug-price-endpoint", Label).update(f"Price: {price_source[:30]}...")
-        self.query_one("#debug-xrpl-endpoint", Label).update(f"XRPL: {xrpl[:30]}...")
+        try:
+            self.query_one("#debug-price-endpoint", Label).update(
+                f"Price: {price_source[:30]}..."
+            )
+            self.query_one("#debug-xrpl-endpoint", Label).update(f"XRPL: {xrpl[:30]}...")
+        except Exception:
+            pass  # Widget not yet mounted
 
 
 class XRPTickerApp(App):
@@ -97,8 +110,8 @@ class XRPTickerApp(App):
         Binding("d", "toggle_debug", "Debug"),
     ]
 
-    # Available themes
-    THEMES = ["ripple", "monokai"]
+    # Available themes (from themes module)
+    THEMES = THEME_NAMES
 
     def __init__(
         self,
@@ -154,9 +167,14 @@ class XRPTickerApp(App):
 
         # Update debug panel with endpoints
         debug_panel = self.query_one(DebugPanel)
+        xrpl_endpoint = (
+            self.config.connections.xrpl_endpoints[0]
+            if self.config.connections.xrpl_endpoints
+            else "---"
+        )
         debug_panel.update_endpoints(
-            price_source="Coinbase API",
-            xrpl=self.config.connections.xrpl_endpoints[0],
+            price_source=self._price_service.service_name,
+            xrpl=xrpl_endpoint,
         )
 
         # Start services
@@ -225,7 +243,7 @@ class XRPTickerApp(App):
         debug_panel = self.query_one(DebugPanel)
         debug_panel.increment_balance_count()
         debug_panel.update_endpoints(
-            price_source="Coinbase API",
+            price_source=self._price_service.service_name if self._price_service else "---",
             xrpl=wallet_data.source,
         )
 
@@ -273,10 +291,11 @@ class XRPTickerApp(App):
 
     def action_cycle_theme(self) -> None:
         """Cycle through available themes."""
-        self._current_theme_index = (self._current_theme_index + 1) % len(self.THEMES)
-        theme_name = self.THEMES[self._current_theme_index]
-        self._apply_theme(theme_name)
-        self.notify(f"Theme: {theme_name.title()}", timeout=2)
+        current_theme = self.THEMES[self._current_theme_index]
+        next_theme = get_next_theme(current_theme)
+        self._current_theme_index = self.THEMES.index(next_theme)
+        self._apply_theme(next_theme)
+        self.notify(f"Theme: {next_theme.title()}", timeout=2)
 
     def _apply_theme(self, theme_name: str) -> None:
         """Apply the specified theme by adding/removing CSS classes."""

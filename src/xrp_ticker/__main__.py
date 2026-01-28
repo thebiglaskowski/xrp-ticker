@@ -54,27 +54,50 @@ def parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
-def prompt_for_wallet() -> str:
-    """Prompt user for wallet address."""
+def prompt_for_wallet() -> str | None:
+    """Prompt user for wallet address.
+
+    Returns:
+        Wallet address string if valid, None if user cancels or max attempts exceeded.
+    """
+    max_attempts = 5
     print("\nNo configuration file found.")
     print("Please enter your XRP wallet address (starts with 'r'):")
+    print("(Press Ctrl+C or enter 'quit' to exit)")
 
-    while True:
-        address = input("> ").strip()
+    for attempt in range(max_attempts):
+        try:
+            address = input("> ").strip()
+        except (EOFError, KeyboardInterrupt):
+            print("\nCancelled.")
+            return None
+
+        if address.lower() in ("quit", "exit", "q"):
+            print("Exiting.")
+            return None
 
         if not address:
-            print("Wallet address cannot be empty. Please try again:")
+            remaining = max_attempts - attempt - 1
+            if remaining > 0:
+                print(f"Wallet address cannot be empty. {remaining} attempts remaining:")
             continue
 
         if not address.startswith("r"):
-            print("XRP addresses must start with 'r'. Please try again:")
+            remaining = max_attempts - attempt - 1
+            if remaining > 0:
+                print(f"XRP addresses must start with 'r'. {remaining} attempts remaining:")
             continue
 
         if len(address) < 25 or len(address) > 35:
-            print("XRP addresses are typically 25-35 characters. Please verify and try again:")
+            remaining = max_attempts - attempt - 1
+            if remaining > 0:
+                print(f"XRP addresses are 25-35 characters. {remaining} attempts remaining:")
             continue
 
         return address
+
+    print("Maximum attempts exceeded.")
+    return None
 
 
 def main() -> int:
@@ -115,6 +138,8 @@ def main() -> int:
         else:
             # Prompt for wallet address
             wallet_address = prompt_for_wallet()
+            if wallet_address is None:
+                return 1
 
         # Ask if they want to save config
         print(f"\nUsing wallet: {wallet_address}")
