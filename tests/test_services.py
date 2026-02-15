@@ -9,11 +9,8 @@ import pytest
 
 from xrp_ticker.models import ConnectionState, PriceData, WalletData
 from xrp_ticker.services.coinbase import CoinbaseService
-from xrp_ticker.services.xrpl_ws import (
-    XRPLWebSocketService,
-    _create_ssl_context,
-    _mask_address,
-)
+from xrp_ticker.services.utils import create_ssl_context, mask_address
+from xrp_ticker.services.xrpl_ws import XRPLWebSocketService
 
 
 class TestCoinbaseService:
@@ -274,15 +271,15 @@ class TestXRPLWebSocketService:
         )
 
         # Initial delay should be around 1.0 (with jitter)
-        delay1 = service._calculate_backoff()
+        delay1 = service._backoff.calculate()
         assert 0.9 <= delay1 <= 1.1
 
         # Next delay should be around 2.0
-        delay2 = service._calculate_backoff()
+        delay2 = service._backoff.calculate()
         assert 1.8 <= delay2 <= 2.2
 
         # Next delay should be around 4.0
-        delay3 = service._calculate_backoff()
+        delay3 = service._backoff.calculate()
         assert 3.6 <= delay3 <= 4.4
 
     def test_reset_backoff(self):
@@ -292,15 +289,15 @@ class TestXRPLWebSocketService:
         )
 
         # Increase backoff
-        service._calculate_backoff()
-        service._calculate_backoff()
-        service._calculate_backoff()
+        service._backoff.calculate()
+        service._backoff.calculate()
+        service._backoff.calculate()
 
         # Reset
-        service._reset_backoff()
+        service._backoff.reset()
 
         # Should be back to initial
-        delay = service._calculate_backoff()
+        delay = service._backoff.calculate()
         assert 0.9 <= delay <= 1.1
 
     @pytest.mark.asyncio
@@ -516,30 +513,30 @@ class TestSecurityHelpers:
 
     def test_mask_address_normal(self):
         """Normal addresses should be masked showing first/last 4 chars."""
-        result = _mask_address("rN7n3473SaZBCG4dFL83w7a1RXtXtbk2D9")
+        result = mask_address("rN7n3473SaZBCG4dFL83w7a1RXtXtbk2D9")
         assert result == "rN7n...k2D9"
         assert "3473SaZBCG4dFL83w7a1RXtXtb" not in result
 
     def test_mask_address_short(self):
         """Short addresses should be fully masked."""
-        result = _mask_address("rShort")
+        result = mask_address("rShort")
         assert result == "***"
 
     def test_mask_address_exactly_8_chars(self):
         """8-char addresses should be fully masked."""
-        result = _mask_address("r1234567")
+        result = mask_address("r1234567")
         assert result == "***"
 
     def test_mask_address_9_chars(self):
         """9-char addresses should show first/last 4."""
-        result = _mask_address("r12345678")
+        result = mask_address("r12345678")
         assert result == "r123...5678"
 
     def test_ssl_context_created(self):
         """SSL context should be created with secure settings."""
         import ssl
 
-        ctx = _create_ssl_context()
+        ctx = create_ssl_context()
 
         assert ctx.check_hostname is True
         assert ctx.verify_mode == ssl.CERT_REQUIRED
@@ -549,5 +546,5 @@ class TestSecurityHelpers:
         """SSL context should be proper SSLContext instance."""
         import ssl
 
-        ctx = _create_ssl_context()
+        ctx = create_ssl_context()
         assert isinstance(ctx, ssl.SSLContext)

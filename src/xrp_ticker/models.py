@@ -1,12 +1,12 @@
 """Pydantic models for XRP Ticker data structures."""
 
 from datetime import datetime
-from enum import Enum
+from enum import StrEnum
 
 from pydantic import BaseModel, Field, field_validator
 
 
-class ConnectionState(str, Enum):
+class ConnectionState(StrEnum):
     """WebSocket connection states."""
 
     CONNECTED = "connected"
@@ -64,27 +64,6 @@ class WalletData(BaseModel):
             balance_xrp=drops / 1_000_000,
             source=source,
         )
-
-
-class XRPLAccountInfo(BaseModel):
-    """XRPL account_info response format."""
-
-    Account: str
-    Balance: str
-
-    def to_wallet_data(self) -> WalletData:
-        """Convert XRPL response to WalletData."""
-        drops = int(self.Balance)
-        return WalletData.from_drops(address=self.Account, drops=drops, source="xrpl")
-
-
-class XRPLResponse(BaseModel):
-    """XRPL WebSocket response wrapper."""
-
-    result: dict | None = None
-    error: str | None = None
-    error_message: str | None = None
-    status: str | None = None
 
 
 class ServiceStatus(BaseModel):

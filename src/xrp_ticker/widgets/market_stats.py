@@ -6,6 +6,8 @@ from textual.reactive import reactive
 from textual.widget import Widget
 from textual.widgets import Label, Static
 
+from ..constants import format_volume
+
 
 class StatBox(Static):
     """A compact stat display box."""
@@ -133,13 +135,7 @@ class MarketStatsWidget(Widget):
         """Update volume display."""
         stat_box = self.query_one("#stat-volume", StatBox)
         if volume is not None:
-            # Format volume with K/M suffixes
-            if volume >= 1_000_000:
-                stat_box.update_value(f"{volume / 1_000_000:.2f}M XRP")
-            elif volume >= 1_000:
-                stat_box.update_value(f"{volume / 1_000:.1f}K XRP")
-            else:
-                stat_box.update_value(f"{volume:.0f} XRP")
+            stat_box.update_value(format_volume(volume))
         else:
             stat_box.update_value("---")
 
@@ -158,7 +154,3 @@ class MarketStatsWidget(Widget):
         self.low_24h = low_24h
         self.volume_24h = volume
 
-    def reset_session(self) -> None:
-        """Reset statistics (kept for compatibility)."""
-        # No longer tracking session data, but keep method for refresh action
-        pass

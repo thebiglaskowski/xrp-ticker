@@ -285,10 +285,6 @@ class XRPTickerApp(App):
         sparkline = self.query_one("#sparkline", SparklineWidget)
         sparkline.clear()
 
-        # Reset market stats session data
-        market_stats = self.query_one("#market-stats", MarketStatsWidget)
-        market_stats.reset_session()
-
     def action_cycle_theme(self) -> None:
         """Cycle through available themes."""
         current_theme = self.THEMES[self._current_theme_index]

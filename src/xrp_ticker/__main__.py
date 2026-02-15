@@ -14,6 +14,7 @@ from .config import (
     load_config,
     setup_logging,
 )
+from .security import validate_xrp_address
 
 
 def parse_args() -> argparse.Namespace:
@@ -109,6 +110,10 @@ def main() -> int:
 
     # Handle --init flag to create config file
     if args.init:
+        if not validate_xrp_address(args.init):
+            print(f"Error: Invalid XRP address: {args.init}")
+            print("XRP addresses start with 'r' and are 25-35 base58 characters.")
+            return 1
         try:
             config_path = create_default_config(args.init)
             print(f"Created config file: {config_path}")

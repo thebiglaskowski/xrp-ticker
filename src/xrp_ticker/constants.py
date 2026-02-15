@@ -1,10 +1,14 @@
 """Centralized constants for XRP Ticker application."""
 
+from importlib.metadata import PackageNotFoundError, version
 from typing import Final
 
-# Application metadata
+# Application metadata - version single-sourced from pyproject.toml
 APP_NAME: Final[str] = "XRP Ticker"
-APP_VERSION: Final[str] = "0.1.0"
+try:
+    APP_VERSION: Final[str] = version("xrp-ticker")
+except PackageNotFoundError:
+    APP_VERSION: Final[str] = "0.1.0"
 APP_DESCRIPTION: Final[str] = "A modern terminal-based XRP portfolio tracker"
 
 # XRP Ledger constants

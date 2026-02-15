@@ -1,6 +1,9 @@
 """Tests for XRPTickerApp module."""
 
 from pathlib import Path
+from unittest.mock import AsyncMock, patch
+
+import pytest
 
 from xrp_ticker.config import AppConfig, ConnectionsConfig, DisplayConfig, WalletConfig
 from xrp_ticker.models import ConnectionState, PriceData, ServiceStatus, WalletData
@@ -204,3 +207,196 @@ class TestAppConstants:
         from xrp_ticker.app import XRPTickerApp
 
         assert XRPTickerApp.TITLE == "XRP Ticker"
+
+
+class TestAppLifecycle:
+    """Integration tests for app mount, data flow, and shutdown."""
+
+    @pytest.fixture
+    def app_config(self):
+        """Create an AppConfig for integration tests."""
+        return AppConfig(
+            wallet=WalletConfig(addresses=["rN7n3473SaZBCG4dFL83w7a1RXtXtbk2D9"]),
+            display=DisplayConfig(theme="ripple"),
+            connections=ConnectionsConfig(),
+        )
+
+    @pytest.mark.asyncio
+    async def test_app_mounts_and_creates_services(self, app_config):
+        """App should mount, create services, and shut down cleanly."""
+        from xrp_ticker.app import XRPTickerApp
+
+        app = XRPTickerApp(config=app_config)
+
+        with (
+            patch(
+                "xrp_ticker.app.CoinbaseService", autospec=True
+            ) as mock_coinbase_cls,
+            patch(
+                "xrp_ticker.app.XRPLWebSocketService", autospec=True
+            ) as mock_xrpl_cls,
+        ):
+            mock_price_svc = mock_coinbase_cls.return_value
+            mock_price_svc.start = AsyncMock()
+            mock_price_svc.stop = AsyncMock()
+            mock_price_svc.service_name = "Coinbase"
+
+            mock_xrpl_svc = mock_xrpl_cls.return_value
+            mock_xrpl_svc.start = AsyncMock()
+            mock_xrpl_svc.stop = AsyncMock()
+
+            async with app.run_test():
+                # Services should have been started
+                mock_price_svc.start.assert_called_once()
+                mock_xrpl_svc.start.assert_called_once()
+
+            # After exit, services should have been stopped
+            mock_price_svc.stop.assert_called_once()
+            mock_xrpl_svc.stop.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_price_callback_updates_widgets(self, app_config):
+        """Price callback should update price display and sparkline."""
+        from xrp_ticker.app import XRPTickerApp
+        from xrp_ticker.widgets import PriceDisplayWidget, SparklineWidget
+
+        app = XRPTickerApp(config=app_config)
+        captured_price_cb = None
+
+        with (
+            patch(
+                "xrp_ticker.app.CoinbaseService", autospec=True
+            ) as mock_coinbase_cls,
+            patch(
+                "xrp_ticker.app.XRPLWebSocketService", autospec=True
+            ) as mock_xrpl_cls,
+        ):
+            def capture_coinbase_init(**kwargs):
+                nonlocal captured_price_cb
+                captured_price_cb = kwargs.get("on_price_update")
+                mock = AsyncMock()
+                mock.start = AsyncMock()
+                mock.stop = AsyncMock()
+                mock.service_name = "Coinbase"
+                mock.on_price_update = captured_price_cb
+                mock.on_status_change = kwargs.get("on_status_change")
+                return mock
+
+            mock_coinbase_cls.side_effect = capture_coinbase_init
+
+            mock_xrpl = AsyncMock()
+            mock_xrpl.start = AsyncMock()
+            mock_xrpl.stop = AsyncMock()
+            mock_xrpl_cls.return_value = mock_xrpl
+
+            async with app.run_test() as pilot:
+                assert captured_price_cb is not None
+
+                # Simulate a price update
+                price_data = PriceData(
+                    price=2.50,
+                    price_change=0.10,
+                    price_change_percent=4.17,
+                    high_24h=2.60,
+                    low_24h=2.40,
+                    volume=1_000_000.0,
+                    source="coinbase",
+                )
+                captured_price_cb(price_data)
+                await pilot.pause()
+
+                # Verify widgets got updated
+                price_widget = app.query_one("#price-display", PriceDisplayWidget)
+                assert price_widget.is_connected is True
+
+                sparkline = app.query_one("#sparkline", SparklineWidget)
+                assert sparkline.price_count == 1
+
+    @pytest.mark.asyncio
+    async def test_balance_callback_updates_portfolio(self, app_config):
+        """Balance callback should update portfolio widget."""
+        from xrp_ticker.app import XRPTickerApp
+        from xrp_ticker.widgets import PortfolioWidget
+
+        app = XRPTickerApp(config=app_config)
+        captured_balance_cb = None
+
+        with (
+            patch(
+                "xrp_ticker.app.CoinbaseService", autospec=True
+            ) as mock_coinbase_cls,
+            patch(
+                "xrp_ticker.app.XRPLWebSocketService", autospec=True
+            ) as mock_xrpl_cls,
+        ):
+            mock_price = AsyncMock()
+            mock_price.start = AsyncMock()
+            mock_price.stop = AsyncMock()
+            mock_price.service_name = "Coinbase"
+            mock_coinbase_cls.return_value = mock_price
+
+            def capture_xrpl_init(**kwargs):
+                nonlocal captured_balance_cb
+                captured_balance_cb = kwargs.get("on_balance_update")
+                mock = AsyncMock()
+                mock.start = AsyncMock()
+                mock.stop = AsyncMock()
+                mock.on_balance_update = captured_balance_cb
+                mock.on_status_change = kwargs.get("on_status_change")
+                return mock
+
+            mock_xrpl_cls.side_effect = capture_xrpl_init
+
+            async with app.run_test() as pilot:
+                assert captured_balance_cb is not None
+
+                # Simulate a balance update
+                wallet_data = WalletData.from_drops(
+                    address="rN7n3473SaZBCG4dFL83w7a1RXtXtbk2D9",
+                    drops=500_000_000,  # 500 XRP
+                    source="xrplcluster.com",
+                )
+                captured_balance_cb(wallet_data)
+                await pilot.pause()
+
+                portfolio = app.query_one("#portfolio", PortfolioWidget)
+                assert portfolio.balance_xrp == 500.0
+
+    @pytest.mark.asyncio
+    async def test_shutdown_clears_callbacks(self, app_config):
+        """Shutdown should clear callbacks before stopping services."""
+        from xrp_ticker.app import XRPTickerApp
+
+        app = XRPTickerApp(config=app_config)
+
+        with (
+            patch(
+                "xrp_ticker.app.CoinbaseService", autospec=True
+            ) as mock_coinbase_cls,
+            patch(
+                "xrp_ticker.app.XRPLWebSocketService", autospec=True
+            ) as mock_xrpl_cls,
+        ):
+            mock_price = AsyncMock()
+            mock_price.start = AsyncMock()
+            mock_price.stop = AsyncMock()
+            mock_price.service_name = "Coinbase"
+            mock_price.on_price_update = None
+            mock_price.on_status_change = None
+            mock_coinbase_cls.return_value = mock_price
+
+            mock_xrpl = AsyncMock()
+            mock_xrpl.start = AsyncMock()
+            mock_xrpl.stop = AsyncMock()
+            mock_xrpl.on_balance_update = None
+            mock_xrpl.on_status_change = None
+            mock_xrpl_cls.return_value = mock_xrpl
+
+            async with app.run_test():
+                pass  # Mount and immediately unmount
+
+            # Callbacks should have been cleared before stop
+            assert mock_price.on_price_update is None
+            assert mock_price.on_status_change is None
+            assert mock_xrpl.on_balance_update is None
+            assert mock_xrpl.on_status_change is None

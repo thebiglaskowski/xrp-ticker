@@ -107,12 +107,6 @@ class PriceDisplayWidget(Widget):
 
         change_label.update(f"{arrow} {self.price_change:+.4f} ({self.price_change_percent:+.2f}%)")
 
-    def watch_is_connected(self, connected: bool) -> None:
-        """React to connection state changes."""
-        if not connected and self.price is not None:
-            # Keep showing price but indicate it may be stale
-            pass
-
     def update_price_data(
         self,
         price: float,

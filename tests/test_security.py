@@ -2,9 +2,8 @@
 
 import time
 
+from xrp_ticker.constants import APP_NAME, APP_VERSION
 from xrp_ticker.security import (
-    APP_NAME,
-    APP_VERSION,
     MAX_HTTP_RESPONSE_SIZE,
     MAX_WEBSOCKET_MESSAGE_SIZE,
     RateLimiter,
@@ -277,10 +276,16 @@ class TestGetSafeUserAgent:
     """Tests for User-Agent generation."""
 
     def test_format(self):
-        """Should return app name and version."""
+        """Should return app name (hyphenated) and version."""
         result = get_safe_user_agent()
-        assert APP_NAME in result
+        assert APP_NAME.replace(" ", "-") in result
         assert APP_VERSION in result
+
+    def test_no_spaces_in_token(self):
+        """User-Agent product token should not contain spaces."""
+        result = get_safe_user_agent()
+        token = result.split("/")[0]
+        assert " " not in token
 
     def test_no_system_info(self):
         """Should not contain system information."""

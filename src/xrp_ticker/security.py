@@ -6,6 +6,8 @@ import secrets
 from functools import lru_cache
 from typing import Final
 
+from .constants import APP_NAME, APP_VERSION
+
 logger = logging.getLogger(__name__)
 
 # Security constants
@@ -30,10 +32,6 @@ TRUSTED_XRPL_DOMAINS: Final[frozenset] = frozenset({
     "s2.ripple.com",
     "xrpl.ws",
 })
-
-# Version info (for User-Agent, not exposed to users)
-APP_VERSION: Final[str] = "1.0.0"
-APP_NAME: Final[str] = "XRP-Ticker"
 
 
 def generate_request_id() -> str:
@@ -177,7 +175,7 @@ def is_trusted_endpoint(endpoint: str) -> bool:
 
 def get_safe_user_agent() -> str:
     """Get a generic User-Agent string that doesn't expose system info."""
-    return f"{APP_NAME}/{APP_VERSION}"
+    return f"{APP_NAME.replace(' ', '-')}/{APP_VERSION}"
 
 
 class RateLimiter:

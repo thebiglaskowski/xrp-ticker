@@ -9,7 +9,6 @@ from xrp_ticker.models import (
     PriceData,
     ServiceStatus,
     WalletData,
-    XRPLAccountInfo,
 )
 
 
@@ -82,22 +81,6 @@ class TestWalletData:
             balance_xrp=0,  # Will be calculated
         )
         assert data.balance_xrp == 50.0
-
-
-class TestXRPLAccountInfo:
-    """Tests for XRPLAccountInfo model."""
-
-    def test_to_wallet_data(self):
-        """XRPLAccountInfo should convert to WalletData."""
-        info = XRPLAccountInfo(
-            Account="rN7n3473SaZBCG4dFL83w7a1RXtXtbk2D9",
-            Balance="123456789",
-        )
-        wallet = info.to_wallet_data()
-
-        assert wallet.address == "rN7n3473SaZBCG4dFL83w7a1RXtXtbk2D9"
-        assert wallet.balance_drops == 123456789
-        assert wallet.balance_xrp == pytest.approx(123.456789, rel=1e-6)
 
 
 class TestServiceStatus:

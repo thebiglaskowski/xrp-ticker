@@ -1,9 +1,12 @@
 """Tests for Textual widget modules."""
 
-
-
+from xrp_ticker.constants import format_volume
 from xrp_ticker.models import ConnectionState
+from xrp_ticker.widgets.market_stats import MarketStatsWidget, StatBox
+from xrp_ticker.widgets.portfolio import PortfolioWidget
+from xrp_ticker.widgets.price_display import PriceDisplayWidget
 from xrp_ticker.widgets.sparkline import STYLE_CHARS, SparklineStyle, SparklineWidget
+from xrp_ticker.widgets.status_bar import StatusBarWidget, StatusIndicator
 
 
 class TestSparklineWidget:
@@ -150,127 +153,148 @@ class TestSparklineStyle:
 
 
 class TestMarketStatsWidget:
-    """Tests for MarketStatsWidget (unit tests without Textual runtime)."""
+    """Tests for MarketStatsWidget."""
 
-    def test_volume_formatting_millions(self):
-        """Volume should format with M suffix for millions."""
-        # Test the formatting logic
-        volume = 5_500_000
-        if volume >= 1_000_000:
-            formatted = f"{volume / 1_000_000:.2f}M XRP"
-        else:
-            formatted = f"{volume:.0f} XRP"
-        assert formatted == "5.50M XRP"
+    def test_widget_constructable(self):
+        """Widget should be constructable with standard params."""
+        widget = MarketStatsWidget(id="test-stats")
+        assert widget.id == "test-stats"
 
-    def test_volume_formatting_thousands(self):
-        """Volume should format with K suffix for thousands."""
-        volume = 75_000
-        if volume >= 1_000_000:
-            formatted = f"{volume / 1_000_000:.2f}M XRP"
-        elif volume >= 1_000:
-            formatted = f"{volume / 1_000:.1f}K XRP"
-        else:
-            formatted = f"{volume:.0f} XRP"
-        assert formatted == "75.0K XRP"
+    def test_has_reactive_attributes(self):
+        """Widget class should define expected reactive attributes."""
+        assert hasattr(MarketStatsWidget, "high_24h")
+        assert hasattr(MarketStatsWidget, "low_24h")
+        assert hasattr(MarketStatsWidget, "volume_24h")
+        assert hasattr(MarketStatsWidget, "current_price")
+        assert hasattr(MarketStatsWidget, "price_change_percent")
 
-    def test_volume_formatting_small(self):
-        """Small volume should format without suffix."""
-        volume = 500
-        if volume >= 1_000_000:
-            formatted = f"{volume / 1_000_000:.2f}M XRP"
-        elif volume >= 1_000:
-            formatted = f"{volume / 1_000:.1f}K XRP"
-        else:
-            formatted = f"{volume:.0f} XRP"
-        assert formatted == "500 XRP"
+    def test_update_from_price_data_method_exists(self):
+        """Widget should expose update_from_price_data method."""
+        widget = MarketStatsWidget()
+        assert callable(widget.update_from_price_data)
 
-    def test_price_change_positive(self):
-        """Positive change should have + prefix."""
-        percent = 5.5
-        if percent > 0:
-            formatted = f"+{percent:.2f}%"
-        else:
-            formatted = f"{percent:.2f}%"
-        assert formatted == "+5.50%"
+    def test_volume_formatting_uses_centralized_function(self):
+        """Volume formatting should match constants.format_volume."""
+        assert format_volume(5_500_000) == "5.50M XRP"
+        assert format_volume(75_000) == "75.0K XRP"
+        assert format_volume(500) == "500 XRP"
 
-    def test_price_change_negative(self):
-        """Negative change should show sign."""
-        percent = -3.25
-        formatted = f"{percent:.2f}%"
-        assert formatted == "-3.25%"
+    def test_statbox_constructable(self):
+        """StatBox should be constructable with label and value."""
+        box = StatBox("Test Label", "---", id="test-box")
+        assert box._label == "Test Label"
+        assert box._value == "---"
 
 
-class TestStatusIndicatorLogic:
-    """Tests for StatusIndicator display logic."""
+class TestStatusIndicator:
+    """Tests for StatusIndicator widget."""
 
-    def test_connected_text(self):
-        """Connected state should show correct text."""
-        service_name = "Coinbase"
-        state = ConnectionState.CONNECTED
-        if state == ConnectionState.CONNECTED:
-            text = f"󰄬 {service_name}: Connected"
-        assert "Connected" in text
+    def test_initial_state(self):
+        """StatusIndicator should start disconnected."""
+        indicator = StatusIndicator("Coinbase")
+        assert indicator.state == ConnectionState.DISCONNECTED
+        assert indicator._service_name == "Coinbase"
 
-    def test_reconnecting_text_with_attempts(self):
-        """Reconnecting with attempts should show count."""
-        service_name = "XRPL"
-        attempts = 3
-        text = f"󰑓 {service_name}: Reconnecting ({attempts})"
-        assert "3" in text
+    def test_update_state_sets_state(self):
+        """update_state should update the reactive state attribute."""
+        indicator = StatusIndicator("Coinbase")
+        indicator.update_state(ConnectionState.CONNECTED, reconnect_attempts=0)
+        assert indicator.state == ConnectionState.CONNECTED
+        assert indicator._reconnect_attempts == 0
 
-    def test_failed_text(self):
-        """Failed state should show failure."""
-        service_name = "XRPL"
-        state = ConnectionState.FAILED
-        if state == ConnectionState.FAILED:
-            text = f"󰅜 {service_name}: Failed"
-        assert "Failed" in text
+    def test_update_state_tracks_reconnect_attempts(self):
+        """update_state should track reconnect attempts."""
+        indicator = StatusIndicator("XRPL")
+        indicator.update_state(ConnectionState.RECONNECTING, reconnect_attempts=3)
+        assert indicator.state == ConnectionState.RECONNECTING
+        assert indicator._reconnect_attempts == 3
+
+    def test_all_connection_states(self):
+        """StatusIndicator should accept all connection states."""
+        indicator = StatusIndicator("Test")
+        for state in ConnectionState:
+            indicator.update_state(state)
+            assert indicator.state == state
 
 
-class TestPriceDisplayLogic:
-    """Tests for PriceDisplay formatting logic."""
+class TestStatusBarWidget:
+    """Tests for StatusBarWidget."""
+
+    def test_constructable(self):
+        """StatusBarWidget should be constructable."""
+        widget = StatusBarWidget(id="test-bar")
+        assert widget.id == "test-bar"
+
+    def test_has_reactive_last_update(self):
+        """Widget class should define last_update reactive."""
+        assert hasattr(StatusBarWidget, "last_update")
+
+    def test_public_api_methods_exist(self):
+        """Widget should expose public API methods."""
+        widget = StatusBarWidget()
+        assert callable(widget.update_price_status)
+        assert callable(widget.update_xrpl_status)
+        assert callable(widget.set_update_time)
+
+
+class TestPriceDisplayWidget:
+    """Tests for PriceDisplayWidget."""
+
+    def test_constructable(self):
+        """Widget should be constructable with standard params."""
+        widget = PriceDisplayWidget(id="test-price")
+        assert widget.id == "test-price"
+
+    def test_has_reactive_attributes(self):
+        """Widget class should define expected reactive attributes."""
+        assert hasattr(PriceDisplayWidget, "price")
+        assert hasattr(PriceDisplayWidget, "price_change")
+        assert hasattr(PriceDisplayWidget, "price_change_percent")
+        assert hasattr(PriceDisplayWidget, "is_connected")
+
+    def test_previous_price_tracking(self):
+        """Widget should initialize previous price as None."""
+        widget = PriceDisplayWidget()
+        assert widget._previous_price is None
+
+    def test_update_price_data_method_exists(self):
+        """Widget should expose update_price_data method."""
+        widget = PriceDisplayWidget()
+        assert callable(widget.update_price_data)
 
     def test_price_formatting(self):
         """Price should be formatted with 4 decimal places."""
-        price = 2.3456
-        formatted = f"$ {price:,.4f}"
-        assert formatted == "$ 2.3456"
+        assert f"$ {2.3456:,.4f}" == "$ 2.3456"
+        assert f"$ {1234.5678:,.4f}" == "$ 1,234.5678"
 
-    def test_price_large_number(self):
-        """Large prices should have thousand separators."""
-        price = 1234.5678
-        formatted = f"$ {price:,.4f}"
-        assert formatted == "$ 1,234.5678"
-
-    def test_change_up_arrow(self):
-        """Positive change should show up arrow."""
+    def test_change_formatting(self):
+        """Price change should show direction and percentage."""
         change = 0.05
         percent = 2.5
-        if change > 0:
-            arrow = ""  # Up arrow
-        elif change < 0:
-            arrow = ""  # Down arrow
-        else:
-            arrow = ""
-        text = f"{arrow} {change:+.4f} ({percent:+.2f}%)"
+        text = f"{change:+.4f} ({percent:+.2f}%)"
         assert "+0.0500" in text
         assert "+2.50%" in text
 
-    def test_change_down_arrow(self):
-        """Negative change should show down arrow."""
-        change = -0.03
-        # Negative change should result in down arrow
-        if change > 0:
-            arrow = ""
-        elif change < 0:
-            arrow = ""
-        else:
-            arrow = ""
-        assert arrow == ""
 
+class TestPortfolioWidget:
+    """Tests for PortfolioWidget."""
 
-class TestPortfolioLogic:
-    """Tests for Portfolio calculation logic."""
+    def test_constructable(self):
+        """Widget should be constructable with standard params."""
+        widget = PortfolioWidget(id="test-portfolio")
+        assert widget.id == "test-portfolio"
+
+    def test_has_reactive_attributes(self):
+        """Widget class should define expected reactive attributes."""
+        assert hasattr(PortfolioWidget, "balance_xrp")
+        assert hasattr(PortfolioWidget, "price_usd")
+        assert hasattr(PortfolioWidget, "portfolio_value")
+
+    def test_public_api_methods_exist(self):
+        """Widget should expose public API methods."""
+        widget = PortfolioWidget()
+        assert callable(widget.update_balance)
+        assert callable(widget.update_price)
 
     def test_portfolio_value_calculation(self):
         """Portfolio value should be balance * price."""
@@ -281,12 +305,8 @@ class TestPortfolioLogic:
 
     def test_portfolio_formatting(self):
         """Portfolio value should format with 2 decimal places."""
-        value = 12345.678
-        formatted = f"${value:,.2f} USD"
-        assert formatted == "$12,345.68 USD"
+        assert f"${12345.678:,.2f} USD" == "$12,345.68 USD"
 
     def test_balance_formatting(self):
         """Balance should format with 2 decimal places."""
-        balance = 1234.567890
-        formatted = f"{balance:,.2f} XRP"
-        assert formatted == "1,234.57 XRP"
+        assert f"{1234.567890:,.2f} XRP" == "1,234.57 XRP"

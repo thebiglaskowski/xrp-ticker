@@ -3,8 +3,6 @@
 import asyncio
 import json
 import logging
-import random
-import ssl
 from collections.abc import Callable
 from datetime import datetime
 from typing import Final
@@ -19,14 +17,9 @@ from ..security import (
     is_trusted_endpoint,
     sanitize_error_message,
 )
+from .utils import BackoffCalculator, create_ssl_context, mask_address
 
 logger = logging.getLogger(__name__)
-
-# Reconnection backoff settings
-INITIAL_DELAY: Final[float] = 1.0
-MAX_DELAY: Final[float] = 60.0
-MULTIPLIER: Final[float] = 2.0
-JITTER: Final[float] = 0.1
 
 # WebSocket settings
 WS_PING_INTERVAL: Final[float] = 30.0
@@ -40,23 +33,6 @@ DEFAULT_ENDPOINTS: Final[list[str]] = [
     "wss://s2.ripple.com",
     "wss://xrpl.ws",
 ]
-
-
-def _mask_address(address: str) -> str:
-    """Mask wallet address for safe logging. Shows first 4 and last 4 characters."""
-    if len(address) > 8:
-        return f"{address[:4]}...{address[-4:]}"
-    return "***"
-
-
-def _create_ssl_context() -> ssl.SSLContext:
-    """Create a secure SSL context for WebSocket connections."""
-    ctx = ssl.create_default_context()
-    ctx.check_hostname = True
-    ctx.verify_mode = ssl.CERT_REQUIRED
-    # Enforce TLS 1.2 minimum
-    ctx.minimum_version = ssl.TLSVersion.TLSv1_2
-    return ctx
 
 
 class XRPLWebSocketService:
@@ -81,7 +57,7 @@ class XRPLWebSocketService:
         self._status = ServiceStatus(name="XRPL", state=ConnectionState.DISCONNECTED)
         self._running = False
         self._task: asyncio.Task | None = None
-        self._current_delay = INITIAL_DELAY
+        self._backoff = BackoffCalculator()
         self._current_endpoint_index = 0
         self._last_balance: WalletData | None = None
         self._consecutive_failures = 0
@@ -125,18 +101,6 @@ class XRPLWebSocketService:
         if self.on_status_change:
             self.on_status_change(self._status)
 
-    def _calculate_backoff(self) -> float:
-        """Calculate next backoff delay with jitter."""
-        jitter_range = self._current_delay * JITTER
-        jitter = random.uniform(-jitter_range, jitter_range)
-        delay = min(self._current_delay + jitter, MAX_DELAY)
-        self._current_delay = min(self._current_delay * MULTIPLIER, MAX_DELAY)
-        return delay
-
-    def _reset_backoff(self) -> None:
-        """Reset backoff delay after successful connection."""
-        self._current_delay = INITIAL_DELAY
-
     def _try_next_endpoint(self) -> bool:
         """Try the next endpoint in the list. Returns False if all endpoints exhausted."""
         next_index = self._current_endpoint_index + 1
@@ -149,7 +113,7 @@ class XRPLWebSocketService:
     async def _fetch_single_balance(self, websocket, address: str) -> int:
         """Fetch balance for a single wallet. Returns drops or 0 on error."""
         request_id = generate_request_id()
-        masked_addr = _mask_address(address)
+        masked_addr = mask_address(address)
 
         request = {
             "id": request_id,
@@ -222,18 +186,21 @@ class XRPLWebSocketService:
             return 0
 
     async def _fetch_all_balances(self, websocket) -> WalletData | None:
-        """Fetch and aggregate balances for all wallets."""
-        total_drops = 0
+        """Fetch and aggregate balances for all wallets concurrently."""
+        if not self.wallet_addresses:
+            return WalletData.from_drops(
+                address="No wallets", drops=0, source=self.current_endpoint
+            )
 
-        for address in self.wallet_addresses:
-            drops = await self._fetch_single_balance(websocket, address)
-            total_drops += drops
+        # Fetch all wallet balances concurrently
+        results = await asyncio.gather(
+            *(self._fetch_single_balance(websocket, addr) for addr in self.wallet_addresses)
+        )
+        total_drops = sum(results)
 
         # Create aggregated wallet data
         wallet_count = len(self.wallet_addresses)
-        if wallet_count == 0:
-            display_address = "No wallets"
-        elif wallet_count == 1:
+        if wallet_count == 1:
             display_address = self.wallet_addresses[0]
         else:
             display_address = f"{wallet_count} wallets"
@@ -249,7 +216,7 @@ class XRPLWebSocketService:
 
     async def _connect_and_poll(self) -> None:
         """Main connection loop with polling and automatic reconnection."""
-        ssl_context = _create_ssl_context()
+        ssl_context = create_ssl_context()
 
         while self._running:
             endpoint = self.current_endpoint
@@ -278,7 +245,7 @@ class XRPLWebSocketService:
                 ) as websocket:
                     logger.info("XRPL WebSocket connected")
                     self._update_status(state=ConnectionState.CONNECTED)
-                    self._reset_backoff()
+                    self._backoff.reset()
                     self._consecutive_failures = 0
 
                     # Poll loop
@@ -354,7 +321,7 @@ class XRPLWebSocketService:
 
             # Wait before reconnecting
             if self._running:
-                delay = self._calculate_backoff()
+                delay = self._backoff.calculate()
                 logger.info(
                     f"Reconnecting in {delay:.1f}s (attempt {self._status.reconnect_attempts})"
                 )
@@ -388,13 +355,13 @@ class XRPLWebSocketService:
     async def restart(self) -> None:
         """Restart the WebSocket connection."""
         await self.stop()
-        self._reset_backoff()
+        self._backoff.reset()
         self._current_endpoint_index = 0  # Reset to first endpoint
         await self.start()
 
     async def fetch_balance_once(self) -> WalletData | None:
         """Fetch balance once without starting the polling loop."""
-        ssl_context = _create_ssl_context()
+        ssl_context = create_ssl_context()
 
         for endpoint in self.endpoints:
             try:
