@@ -33,12 +33,13 @@ A modern, visually stunning terminal-based XRP portfolio tracker with real-time 
 git clone git@github.com:thebiglaskowski/xrp-ticker.git
 cd xrp-ticker
 
-# Create and activate a conda environment (recommended)
-conda create -n xrp-ticker python=3.11
-conda activate xrp-ticker
+# Install uv (if not already installed)
+curl -LsSf https://astral.sh/uv/install.sh | sh
 
-# Install the package
-pip install -e ".[dev]"
+# Create a virtual environment and install
+uv venv
+source .venv/bin/activate
+uv pip install -e ".[dev]"
 ```
 
 ## ⚙️ Configuration
@@ -132,7 +133,7 @@ Classic dark theme with vibrant accents:
 
 ```bash
 # Install with dev dependencies
-pip install -e ".[dev]"
+uv pip install -e ".[dev]"
 
 # Run linter
 ruff check src/
