@@ -435,3 +435,152 @@ Screen.theme-monokai {
 .theme-monokai #help-title {
     color: $monokai-yellow;
 }
+
+/* ============================================
+   CYBERPUNK THEME OVERRIDES
+   ============================================ */
+
+/* Cyberpunk color palette */
+$cyber-bg: #0A0A0A;
+$cyber-bg-surface: #111111;
+$cyber-bg-card: #1A1A1A;
+$cyber-green: #00FF41;
+$cyber-green-dim: #008F11;
+$cyber-green-dark: #003B00;
+$cyber-yellow: #FFFF00;
+$cyber-red: #FF0040;
+$cyber-text: #00FF41;
+$cyber-muted: #008F11;
+
+Screen.theme-cyberpunk {
+    background: $cyber-bg;
+    color: $cyber-text;
+}
+
+.theme-cyberpunk #header-title {
+    color: $cyber-green;
+    background: $cyber-bg-surface;
+    border-bottom: solid $cyber-green-dim;
+}
+
+.theme-cyberpunk PriceDisplayWidget .price-container {
+    border: double $cyber-green;
+    background: $cyber-bg-card;
+}
+
+.theme-cyberpunk PriceDisplayWidget .price-source {
+    color: $cyber-muted;
+}
+
+.theme-cyberpunk PriceDisplayWidget .price-large {
+    color: $cyber-green;
+}
+
+.theme-cyberpunk PriceDisplayWidget .price-up {
+    color: $cyber-green;
+}
+
+.theme-cyberpunk PriceDisplayWidget .price-down {
+    color: $cyber-red;
+}
+
+.theme-cyberpunk StatBox {
+    border: round $cyber-green-dim;
+    background: $cyber-bg-card;
+}
+
+.theme-cyberpunk StatBox .stat-label {
+    color: $cyber-muted;
+}
+
+.theme-cyberpunk StatBox .stat-value {
+    color: $cyber-green;
+}
+
+.theme-cyberpunk .market-stat-high {
+    color: $cyber-green;
+}
+
+.theme-cyberpunk .market-stat-low {
+    color: $cyber-red;
+}
+
+.theme-cyberpunk SparklineWidget {
+    color: $cyber-green-dim;
+}
+
+.theme-cyberpunk SparklineWidget.trend-up {
+    color: $cyber-green;
+}
+
+.theme-cyberpunk SparklineWidget.trend-down {
+    color: $cyber-red;
+}
+
+.theme-cyberpunk PortfolioWidget .portfolio-container {
+    border: double $cyber-green;
+    background: $cyber-bg-card;
+}
+
+.theme-cyberpunk PortfolioWidget .portfolio-title {
+    color: $cyber-muted;
+}
+
+.theme-cyberpunk PortfolioWidget .balance-value {
+    color: $cyber-green;
+}
+
+.theme-cyberpunk PortfolioWidget .portfolio-value-label {
+    color: $cyber-green;
+}
+
+.theme-cyberpunk PortfolioWidget .balance-value-unavailable {
+    color: $cyber-muted;
+}
+
+.theme-cyberpunk StatusBarWidget {
+    background: $cyber-bg-surface;
+    border-top: solid $cyber-green-dim;
+}
+
+.theme-cyberpunk StatusIndicator.connected {
+    color: $cyber-green;
+}
+
+.theme-cyberpunk StatusIndicator.disconnected {
+    color: $cyber-muted;
+}
+
+.theme-cyberpunk StatusIndicator.reconnecting {
+    color: $cyber-yellow;
+}
+
+.theme-cyberpunk StatusIndicator.failed {
+    color: $cyber-red;
+}
+
+.theme-cyberpunk .status-time {
+    color: $cyber-muted;
+}
+
+.theme-cyberpunk #debug-panel {
+    background: $cyber-bg-surface;
+    border-left: solid $cyber-green-dim;
+}
+
+.theme-cyberpunk #debug-title {
+    color: $cyber-green;
+}
+
+.theme-cyberpunk .debug-item {
+    color: $cyber-muted;
+}
+
+.theme-cyberpunk #help-content {
+    border: double $cyber-green;
+    background: $cyber-bg-surface;
+}
+
+.theme-cyberpunk #help-title {
+    color: $cyber-green;
+}

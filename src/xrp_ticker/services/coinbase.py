@@ -172,60 +172,48 @@ class CoinbaseService:
 
     async def _poll_loop(self) -> None:
         """Main polling loop with circuit breaker pattern."""
-        self._client = httpx.AsyncClient(
-            headers=DEFAULT_HEADERS,
-            timeout=httpx.Timeout(self.request_timeout, connect=10.0),
-            limits=httpx.Limits(max_connections=10, max_keepalive_connections=5),
-        )
+        while self._running:
+            # Circuit breaker: if too many failures, back off
+            if self._consecutive_failures >= self._max_consecutive_failures:
+                backoff = min(30, self._consecutive_failures * 5)
+                logger.warning(
+                    "Circuit breaker: backing off %ds after %d failures",
+                    backoff, self._consecutive_failures
+                )
+                self._update_status(
+                    state=ConnectionState.RECONNECTING,
+                    error_message="Too many failures, backing off",
+                )
+                await asyncio.sleep(backoff)
+                self._consecutive_failures = 0  # Reset after backoff
 
-        try:
-            while self._running:
-                # Circuit breaker: if too many failures, back off
-                if self._consecutive_failures >= self._max_consecutive_failures:
-                    backoff = min(30, self._consecutive_failures * 5)
-                    logger.warning(
-                        "Circuit breaker: backing off %ds after %d failures",
-                        backoff, self._consecutive_failures
-                    )
+            price_data = await self._fetch_price()
+
+            if price_data:
+                self._status.last_message = datetime.now()
+
+                if self._status.state != ConnectionState.CONNECTED:
+                    self._update_status(state=ConnectionState.CONNECTED)
+                    logger.info("%s connected", SERVICE_NAME)
+
+                if self.on_price_update:
+                    self.on_price_update(price_data)
+
+                logger.debug(
+                    "Price: $%.4f | 24h: $%.4f-$%.4f | Change: %+.2f%%",
+                    price_data.price,
+                    price_data.low_24h or 0,
+                    price_data.high_24h or 0,
+                    price_data.price_change_percent,
+                )
+            else:
+                if self._status.state == ConnectionState.CONNECTED:
                     self._update_status(
                         state=ConnectionState.RECONNECTING,
-                        error_message="Too many failures, backing off",
+                        error_message="Failed to fetch price",
                     )
-                    await asyncio.sleep(backoff)
-                    self._consecutive_failures = 0  # Reset after backoff
 
-                price_data = await self._fetch_price()
-
-                if price_data:
-                    self._status.last_message = datetime.now()
-
-                    if self._status.state != ConnectionState.CONNECTED:
-                        self._update_status(state=ConnectionState.CONNECTED)
-                        logger.info("%s connected", SERVICE_NAME)
-
-                    if self.on_price_update:
-                        self.on_price_update(price_data)
-
-                    logger.debug(
-                        "Price: $%.4f | 24h: $%.4f-$%.4f | Change: %+.2f%%",
-                        price_data.price,
-                        price_data.low_24h or 0,
-                        price_data.high_24h or 0,
-                        price_data.price_change_percent,
-                    )
-                else:
-                    if self._status.state == ConnectionState.CONNECTED:
-                        self._update_status(
-                            state=ConnectionState.RECONNECTING,
-                            error_message="Failed to fetch price",
-                        )
-
-                await asyncio.sleep(self.poll_interval)
-
-        finally:
-            if self._client:
-                await self._client.aclose()
-                self._client = None
+            await asyncio.sleep(self.poll_interval)
 
     async def start(self) -> None:
         """Start the polling service."""
@@ -233,6 +221,11 @@ class CoinbaseService:
             logger.warning("%s service already running", SERVICE_NAME)
             return
 
+        self._client = httpx.AsyncClient(
+            headers=DEFAULT_HEADERS,
+            timeout=httpx.Timeout(self.request_timeout, connect=10.0),
+            limits=httpx.Limits(max_connections=10, max_keepalive_connections=5),
+        )
         self._running = True
         self._update_status(state=ConnectionState.RECONNECTING)
         self._task = asyncio.create_task(self._poll_loop())
@@ -249,6 +242,10 @@ class CoinbaseService:
             except asyncio.CancelledError:
                 pass
             self._task = None
+
+        if self._client:
+            await self._client.aclose()
+            self._client = None
 
         self._update_status(state=ConnectionState.DISCONNECTED)
         logger.info("%s service stopped", SERVICE_NAME)

@@ -8,13 +8,14 @@ from textual.app import App, ComposeResult
 from textual.binding import Binding
 from textual.containers import Container, Horizontal, Vertical
 from textual.screen import ModalScreen
-from textual.widgets import Label, Static
+from textual.widgets import Label
 
 from .config import AppConfig
 from .models import ConnectionState, PriceData, ServiceStatus, WalletData
 from .services import CoinbaseService, XRPLWebSocketService
 from .themes import THEME_NAMES, get_next_theme
 from .widgets import (
+    DebugPanel,
     MarketStatsWidget,
     PortfolioWidget,
     PriceDisplayWidget,
@@ -52,49 +53,6 @@ class HelpScreen(ModalScreen):
                 yield Label("Press any key to close", classes="help-desc")
 
 
-class DebugPanel(Static):
-    """Debug panel showing connection stats."""
-
-    def __init__(self) -> None:
-        super().__init__(id="debug-panel")
-        self._price_messages = 0
-        self._balance_messages = 0
-
-    def compose(self) -> ComposeResult:
-        yield Label("Debug Info", id="debug-title")
-        yield Label("Price messages: 0", id="debug-price-count", classes="debug-item")
-        yield Label("Balance messages: 0", id="debug-balance-count", classes="debug-item")
-        yield Label("Price source: ---", id="debug-price-endpoint", classes="debug-item")
-        yield Label("XRPL endpoint: ---", id="debug-xrpl-endpoint", classes="debug-item")
-
-    def increment_price_count(self) -> None:
-        self._price_messages += 1
-        try:
-            self.query_one("#debug-price-count", Label).update(
-                f"Price messages: {self._price_messages}"
-            )
-        except Exception:
-            pass  # Widget not yet mounted
-
-    def increment_balance_count(self) -> None:
-        self._balance_messages += 1
-        try:
-            self.query_one("#debug-balance-count", Label).update(
-                f"Balance messages: {self._balance_messages}"
-            )
-        except Exception:
-            pass  # Widget not yet mounted
-
-    def update_endpoints(self, price_source: str = "---", xrpl: str = "---") -> None:
-        try:
-            self.query_one("#debug-price-endpoint", Label).update(
-                f"Price: {price_source[:30]}..."
-            )
-            self.query_one("#debug-xrpl-endpoint", Label).update(f"XRPL: {xrpl[:30]}...")
-        except Exception:
-            pass  # Widget not yet mounted
-
-
 class XRPTickerApp(App):
     """Main XRP Ticker application."""
 
@@ -123,7 +81,10 @@ class XRPTickerApp(App):
         self._price_service: CoinbaseService | None = None
         self._xrpl_service: XRPLWebSocketService | None = None
         self._debug_visible = False
-        self._current_theme_index = 0
+        theme = config.display.theme
+        self._current_theme_index = (
+            self.THEMES.index(theme) if theme in self.THEMES else 0
+        )
 
     def compose(self) -> ComposeResult:
         """Create the application layout."""
@@ -149,6 +110,9 @@ class XRPTickerApp(App):
     async def on_mount(self) -> None:
         """Initialize services when the app mounts."""
         logger.info("XRP Ticker starting...")
+
+        # Apply configured theme on startup
+        self._apply_theme(self.THEMES[self._current_theme_index])
 
         # Initialize price service (Coinbase - works in US)
         self._price_service = CoinbaseService(
